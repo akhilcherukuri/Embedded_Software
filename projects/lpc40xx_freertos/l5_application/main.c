@@ -14,9 +14,35 @@ static void create_uart_task(void);
 static void blink_task(void *params);
 static void uart_task(void *params);
 
+typedef struct {
+  float f1; // 4 bytes
+  char c1;  // 1 byte
+  float f2;
+  char c2;
+} __attribute__((packed)) my_s1;
+
+typedef struct {
+  float f1; // 4 bytes
+  char c1;  // 1 byte
+  float f2;
+  char c2;
+} my_s2;
+
 int main(void) {
   create_blinky_tasks();
   create_uart_task();
+
+  // TODO: Instantiate a struct of type my_s with the name of "s"
+  my_s2 s2;
+  my_s1 s1;
+  printf("Size : %d bytes\n"
+         "floats 0x%p 0x%p\n"
+         "chars  0x%p 0x%p\n",
+         sizeof(s1), &s1.f1, &s1.f2, &s1.c1, &s1.c2);
+  printf("Size : %d bytes\n"
+         "floats 0x%p 0x%p\n"
+         "chars  0x%p 0x%p\n",
+         sizeof(s2), &s2.f1, &s2.f2, &s2.c1, &s2.c2);
 
   puts("Starting RTOS");
   vTaskStartScheduler(); // This function never returns unless RTOS scheduler runs out of memory and fails
