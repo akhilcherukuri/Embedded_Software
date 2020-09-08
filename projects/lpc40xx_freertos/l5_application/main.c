@@ -14,14 +14,43 @@ static void create_uart_task(void);
 static void blink_task(void *params);
 static void uart_task(void *params);
 
+static void task_one(void *task_parameter);
+static void task_two(void *task_parameter);
+
 int main(void) {
   create_blinky_tasks();
   create_uart_task();
+  /*---------------------->SAME PRIORITY:LOW<----------------------*/
+  // xTaskCreate(task_one, "task_one", 4096 / sizeof(void *), (void *)1, PRIORITY_LOW, NULL);
+  // xTaskCreate(task_two, "task_two", 4096 / sizeof(void *), (void *)1, PRIORITY_LOW, NULL);
+  /*---------------------->DIFFERENT PRIORITY:T1:HIGH T2:LOW<----------------------*/
+  // xTaskCreate(task_one, "task_one", 4096 / sizeof(void *), (void *)1, PRIORITY_MEDIUM, NULL);
+  // xTaskCreate(task_two, "task_two", 4096 / sizeof(void *), (void *)1, PRIORITY_LOW, NULL);
+  /*---------------------->DIFFERENT PRIORITY:T1:LOW T2:HIGH<----------------------*/
+  xTaskCreate(task_one, "task_one", 4096 / sizeof(void *), (void *)1, PRIORITY_LOW, NULL);
+  xTaskCreate(task_two, "task_two", 4096 / sizeof(void *), (void *)1, PRIORITY_MEDIUM, NULL);
 
   puts("Starting RTOS");
   vTaskStartScheduler(); // This function never returns unless RTOS scheduler runs out of memory and fails
 
   return 0;
+}
+
+static void task_one(void *task_parameter) {
+  while (true) {
+    // Read existing main.c regarding when we should use fprintf(stderr...) in place of printf()
+    // For this lab, we will use fprintf(stderr, ...)
+    fprintf(stderr, "AAAAAAAAAAAAAAAAAAAAAAAA");
+    // Sleep for 100ms
+    vTaskDelay(100);
+  }
+}
+
+static void task_two(void *task_parameter) {
+  while (true) {
+    fprintf(stderr, "xxxxxxxxxxxxxxxxxxxxxxxx");
+    vTaskDelay(100);
+  }
 }
 
 static void create_blinky_tasks(void) {
