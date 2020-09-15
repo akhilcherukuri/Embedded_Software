@@ -8,12 +8,19 @@
 #include "lpc40xx.h"
 #include "sj2_cli.h"
 
+// part_1 , part_2, part_3, easter_egg
+#define part_3
+
+#ifdef part_3
 static SemaphoreHandle_t switch_press_indication;
+#endif
 
 typedef struct {
   uint8_t port;
   uint8_t pin;
 } port_pin_s;
+
+#ifdef part_1
 // PART 1
 static void led_task1(void *pvParameters) {
   // Choose one of the onboard LEDS by looking into schematics and write code for the below
@@ -34,6 +41,9 @@ static void led_task1(void *pvParameters) {
     vTaskDelay(200);
   }
 }
+#endif
+
+#ifdef part_2
 // PART 2
 static void led_task2(void *task_parameter) {
   // Type-cast the paramter that was passed from xTaskCreate()
@@ -47,6 +57,9 @@ static void led_task2(void *task_parameter) {
     vTaskDelay(100);
   }
 }
+#endif
+
+#ifdef part_3
 // PART 3
 static void led_task(void *task_parameter) {
   const port_pin_s *led = (port_pin_s *)task_parameter;
@@ -76,30 +89,36 @@ static void switch_task(void *task_parameter) {
     vTaskDelay(100);
   }
 }
+#endif
+
+#ifdef easter_egg
+// Easter EGG
+#endif
 
 int main(void) {
-  // PART 0
-  // xTaskCreate(led_task1, "led0", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
 
-  // PART 1
-  // static port_pin_s led0 = {18};
-  // static port_pin_s led1 = {24};
-  // xTaskCreate(led_task2, "led0", 2048 / sizeof(void *), (void *)&led0, PRIORITY_LOW, NULL);
-  // xTaskCreate(led_task2, "led1", 2048 / sizeof(void *), (void *)&led1, PRIORITY_LOW, NULL);
+#ifdef part_1
+  xTaskCreate(led_task1, "led0", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+#endif
 
-  // PART 3
+#ifdef part_2
+  static port_pin_s led0 = {1, 18};
+  static port_pin_s led1 = {1, 24};
+  xTaskCreate(led_task2, "led0", 2048 / sizeof(void *), (void *)&led0, PRIORITY_LOW, NULL);
+  xTaskCreate(led_task2, "led1", 2048 / sizeof(void *), (void *)&led1, PRIORITY_LOW, NULL);
+#endif
+
+#ifdef part_3
   switch_press_indication = xSemaphoreCreateBinary();
   static port_pin_s sjtwo_switch = {1, 15};
-  static port_pin_s sjtwo_led0 = {1, 18};
-  static port_pin_s sjtwo_led1 = {1, 24};
   static port_pin_s sjtwo_led2 = {1, 26};
-  static port_pin_s sjtwo_led3 = {2, 3};
-
-  xTaskCreate(led_task, "led0", 1024, &sjtwo_led0, PRIORITY_LOW, NULL);
-  xTaskCreate(led_task, "led2", 1024, &sjtwo_led1, PRIORITY_LOW, NULL);
+ 
   xTaskCreate(led_task, "led3", 1024, &sjtwo_led2, PRIORITY_LOW, NULL);
-  xTaskCreate(led_task, "led4", 1024, &sjtwo_led3, PRIORITY_LOW, NULL);
   xTaskCreate(switch_task, "switch", 1024, &sjtwo_switch, PRIORITY_LOW, NULL);
+#endif
+
+#ifdef easter_egg
+#endif
 
   vTaskStartScheduler(); // This function never returns unless RTOS scheduler runs out of memory and fails
 
