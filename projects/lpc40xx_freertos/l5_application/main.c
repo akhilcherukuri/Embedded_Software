@@ -14,8 +14,8 @@ typedef struct {
   uint8_t port;
   uint8_t pin;
 } port_pin_s;
-//PART 1
-void led_task1(void *pvParameters) {
+// PART 1
+static void led_task1(void *pvParameters) {
   // Choose one of the onboard LEDS by looking into schematics and write code for the below
   /* Set the IOCON MUX function select pins to 000 */
   LPC_IOCON->P1_18 &= ~(7U << 0);
@@ -34,8 +34,8 @@ void led_task1(void *pvParameters) {
     vTaskDelay(200);
   }
 }
-//PART 2
-void led_task2(void *task_parameter) {
+// PART 2
+static void led_task2(void *task_parameter) {
   // Type-cast the paramter that was passed from xTaskCreate()
   const port_pin_s *led = (port_pin_s *)(task_parameter);
 
@@ -47,8 +47,8 @@ void led_task2(void *task_parameter) {
     vTaskDelay(100);
   }
 }
-//PART 3
-void led_task(void *task_parameter) {
+// PART 3
+static void led_task(void *task_parameter) {
   const port_pin_s *led = (port_pin_s *)task_parameter;
 
   while (true) {
@@ -63,7 +63,7 @@ void led_task(void *task_parameter) {
   }
 }
 
-void switch_task(void *task_parameter) {
+static void switch_task(void *task_parameter) {
   const port_pin_s *sw = (port_pin_s *)task_parameter;
 
   while (true) {
@@ -78,16 +78,16 @@ void switch_task(void *task_parameter) {
 }
 
 int main(void) {
-  //PART 0
+  // PART 0
   // xTaskCreate(led_task1, "led0", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
 
-  //PART 1
+  // PART 1
   // static port_pin_s led0 = {18};
   // static port_pin_s led1 = {24};
   // xTaskCreate(led_task2, "led0", 2048 / sizeof(void *), (void *)&led0, PRIORITY_LOW, NULL);
   // xTaskCreate(led_task2, "led1", 2048 / sizeof(void *), (void *)&led1, PRIORITY_LOW, NULL);
 
-  //PART 3
+  // PART 3
   switch_press_indication = xSemaphoreCreateBinary();
   static port_pin_s sjtwo_switch = {1, 15};
   static port_pin_s sjtwo_led0 = {1, 18};
@@ -96,9 +96,9 @@ int main(void) {
   static port_pin_s sjtwo_led3 = {2, 3};
 
   xTaskCreate(led_task, "led0", 1024, &sjtwo_led0, PRIORITY_LOW, NULL);
-  xTaskCreate(led_task, "led2", 1024, &sjtwo_led0, PRIORITY_LOW, NULL);
-  xTaskCreate(led_task, "led3", 1024, &sjtwo_led0, PRIORITY_LOW, NULL);
-  xTaskCreate(led_task, "led4", 1024, &sjtwo_led0, PRIORITY_LOW, NULL);
+  xTaskCreate(led_task, "led2", 1024, &sjtwo_led1, PRIORITY_LOW, NULL);
+  xTaskCreate(led_task, "led3", 1024, &sjtwo_led2, PRIORITY_LOW, NULL);
+  xTaskCreate(led_task, "led4", 1024, &sjtwo_led3, PRIORITY_LOW, NULL);
   xTaskCreate(switch_task, "switch", 1024, &sjtwo_switch, PRIORITY_LOW, NULL);
 
   vTaskStartScheduler(); // This function never returns unless RTOS scheduler runs out of memory and fails
