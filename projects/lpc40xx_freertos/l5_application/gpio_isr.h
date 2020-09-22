@@ -4,8 +4,8 @@
 #include "stdlib.h"
 
 // Part_2 for only Port 0
-// extra_credit for Ports 0,1,2
-#define Part_2
+// extra_credit for Ports 0,2
+#define extra_credit
 
 #ifdef Part_2
 typedef enum {

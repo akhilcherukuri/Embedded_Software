@@ -4,7 +4,6 @@
 #include "semphr.h"
 #include "task.h"
 
-#include "board_io.h"
 #include "delay.h"
 #include "gpio.h"
 #include "gpio_isr.h"
@@ -12,9 +11,11 @@
 #include "lpc_peripherals.h"
 #include "sj2_cli.h"
 
-#define Part_2
+// ************************change to Part_0,Part_1,Part_2,extra_credit************************
+#define extra_credit
 
-#ifdef Part_2
+// ************************change to extra_credit,Part_2************************
+#ifdef extra_credit
 static SemaphoreHandle_t switch_pressed_signal;
 static SemaphoreHandle_t switch_pressed_signal2;
 
@@ -162,7 +163,22 @@ int main(void) {
   xTaskCreate(pin30_interrupt, "pin30_interrupt", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   xTaskCreate(pin29_interrupt, "pin29_interrupt", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
   vTaskStartScheduler();
+#endif
 
+#ifdef extra_credit
+  switch_pressed_signal = xSemaphoreCreateBinary();
+  switch_pressed_signal2 = xSemaphoreCreateBinary();
+
+  lpc_peripheral__enable_interrupt(LPC_PERIPHERAL__GPIO, gpio_ports__interrupt_dispatcher, "gpio_interrupt");
+  configure_your_gpio_interrupt();
+  NVIC_EnableIRQ(GPIO_IRQn);
+
+  gpio_ports__attach_interrupt(0, 30, GPIO_INTR__RISING_EDGE, pin30_isr);
+  gpio_ports__attach_interrupt(0, 29, GPIO_INTR__FALLING_EDGE, pin29_isr);
+
+  xTaskCreate(pin30_interrupt, "pin30_interrupt", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(pin29_interrupt, "pin29_interrupt", (512U * 4) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  vTaskStartScheduler();
 #endif
 
   return 0;

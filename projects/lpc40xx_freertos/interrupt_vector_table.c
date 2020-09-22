@@ -5,7 +5,10 @@
 #include "freertos_interrupt_handlers.h"
 #include "function_types.h"
 #include "lpc40xx.h"
+
+// ************************Uncomment for Part_0************************
 //#define Part_0
+
 /**
  * _estack symbol is actually a pointer to the start of the stack memory (provided by the linker script).
  * Declaring as unsigned int to inform compiler that this symbol is constant and defined at link time.
