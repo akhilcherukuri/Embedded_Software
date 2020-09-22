@@ -122,7 +122,7 @@ void gpio_ports__interrupt_dispatcher(void) {
         function_pointer_t attached_user_handler = gpios_falling_edge_callbacks[1][pin_that_generated_interrupt];
         attached_user_handler();
       }
-      clear_pins_interrupt(1, pin_that_generated_interrupt);
+      clear_pins_interrupt(2, pin_that_generated_interrupt);
     }
     pin_that_generated_interrupt++;
   }
@@ -132,7 +132,7 @@ void gpio_ports__interrupt_dispatcher(void) {
         function_pointer_t attached_user_handler = gpios_falling_edge_callbacks[1][pin_that_generated_interrupt];
         attached_user_handler();
       }
-      clear_pins_interrupt(1, pin_that_generated_interrupt);
+      clear_pins_interrupt(2, pin_that_generated_interrupt);
     }
     pin_that_generated_interrupt++;
   }

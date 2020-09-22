@@ -3,8 +3,8 @@
 #include "stdio.h"
 #include "stdlib.h"
 
-// Part_2 for only Port 0
-// extra_credit for Ports 0,2
+// ************************Part_2 for only Port 0************************
+// ************************extra_credit for Ports 0,2************************
 #define extra_credit
 
 #ifdef Part_2
