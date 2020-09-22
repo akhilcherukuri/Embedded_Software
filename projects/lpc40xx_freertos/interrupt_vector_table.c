@@ -5,7 +5,7 @@
 #include "freertos_interrupt_handlers.h"
 #include "function_types.h"
 #include "lpc40xx.h"
-#define Part_0
+//#define Part_0
 /**
  * _estack symbol is actually a pointer to the start of the stack memory (provided by the linker script).
  * Declaring as unsigned int to inform compiler that this symbol is constant and defined at link time.
@@ -96,7 +96,11 @@ __attribute__((section(".interrupt_vector_table"))) const function__void_f inter
     lpc_peripheral__interrupt_dispatcher, // 51 UART 4
     lpc_peripheral__interrupt_dispatcher, // 52 SSP 2
     lpc_peripheral__interrupt_dispatcher, // 53 LCD
-    gpio_interrupt,                       // 54 GPIO Interrupt
+#ifdef Part_0
+    gpio_interrupt,
+#else
+    lpc_peripheral__interrupt_dispatcher, // 54 GPIO Interrupt
+#endif
     lpc_peripheral__interrupt_dispatcher, // 55 PWM 0
     lpc_peripheral__interrupt_dispatcher, // 56 EEPROM
 };
