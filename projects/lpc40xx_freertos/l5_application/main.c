@@ -74,6 +74,11 @@ static QueueHandle_t adc_to_pwm_task_queue;
 void pin_configure_adc_channel_as_io_pin() { gpio__construct_with_function(GPIO__PORT_0, 25, GPIO__FUNCTION_1); }
 void pin_configure_pwm_channel_as_io_pin() { gpio__construct_with_function(GPIO__PORT_2, 0, GPIO__FUNCTION_1); }
 
+// Mapping a numeric range onto another defined range
+static double range_mapping(double current_value, double input_minimum, double input_maximum, double output_minimum, double output_maximum) {
+  return (current_value - input_minimum) * (output_maximum - output_minimum) / (input_maximum - input_minimum) + output_minimum;
+}
+
 static void adc_task(void *p) {
   // NOTE: Reuse the code from Part 1
   adc__initialize();
@@ -88,7 +93,7 @@ static void adc_task(void *p) {
     adc_reading = adc__get_channel_reading_with_burst_mode(ADC__CHANNEL_2);
     fprintf(stderr, "SENT ADC READING: %d\n", adc_reading);
     xQueueSend(adc_to_pwm_task_queue, &adc_reading, 0);
-    vTaskDelay(100);
+    vTaskDelay(250);
   }
 }
 
@@ -99,11 +104,17 @@ static void pwm_task(void *p) {
   pin_configure_pwm_channel_as_io_pin();
   pwm1__set_duty_cycle(PWM1__2_0, 50);
 
-  // int adc_reading = 0;
+  double adc_voltage = 0, brightness_percent = 0;
+  int adc_to_pwm_duty_cycle = 0;
   while (1) {
     // Implement code to receive potentiometer value from queue
     if (xQueueReceive(adc_to_pwm_task_queue, &adc_reading, 100)) {
-      fprintf(stderr, "RECEIVED ADC READING: %d\n", adc_reading);
+      adc_voltage = adc_reading * 3.3 / 4095; 
+      brightness_percent = range_mapping((double)adc_reading, 48.0, 4095.0, 0.0, 100.0);
+      adc_to_pwm_duty_cycle = range_mapping((double)adc_reading, 48.0, 4095.0, 0.0, 100.0);
+      fprintf(stderr, "RECEIVED ADC VOLTAGE: %.1f\n", adc_voltage);
+      fprintf(stderr, "LED BRIGHTNESS: %.0f\n", brightness_percent);
+      pwm1__set_duty_cycle(PWM1__2_0, adc_to_pwm_duty_cycle);
     }
     // We do not need task delay because our queue API will put task to sleep when there is no data in the queue
     // vTaskDelay(100);
@@ -113,7 +124,6 @@ static void pwm_task(void *p) {
 #endif
 
 int main(void) {
-
 
 #ifdef Part_2_3
   adc_to_pwm_task_queue = xQueueCreate(1, sizeof(int));
