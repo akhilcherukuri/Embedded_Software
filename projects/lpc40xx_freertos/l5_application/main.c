@@ -5,9 +5,11 @@
 
 #include "adc.h"
 #include "gpio.h"
+#include "pwm1.h"
+#include "queue.h"
 
-/// Change to Part_0, Part_1, Part_2
-#define Part_1
+/// Change to Part_0, Part_1, Part_2_3
+#define Part_2_3
 
 #ifdef Part_0
 
@@ -66,7 +68,58 @@ void adc_task(void *p) {
 
 #endif
 
+#ifdef Part_2_3
+static QueueHandle_t adc_to_pwm_task_queue;
+
+void pin_configure_adc_channel_as_io_pin() { gpio__construct_with_function(GPIO__PORT_0, 25, GPIO__FUNCTION_1); }
+void pin_configure_pwm_channel_as_io_pin() { gpio__construct_with_function(GPIO__PORT_2, 0, GPIO__FUNCTION_1); }
+
+static void adc_task(void *p) {
+  // NOTE: Reuse the code from Part 1
+  adc__initialize();
+  adc__enable_burst_mode();
+  pin_configure_adc_channel_as_io_pin();
+
+  int adc_reading = 0; // Note that this 'adc_reading' is not the same variable as the one from adc_task
+  while (1) {
+    // Implement code to send potentiometer value on the queue
+    // a) read ADC input to 'int adc_reading'
+    // b) Send to queue: xQueueSend(adc_to_pwm_task_queue, &adc_reading, 0);
+    adc_reading = adc__get_channel_reading_with_burst_mode(ADC__CHANNEL_2);
+    fprintf(stderr, "SENT ADC READING: %d\n", adc_reading);
+    xQueueSend(adc_to_pwm_task_queue, &adc_reading, 0);
+    vTaskDelay(100);
+  }
+}
+
+static void pwm_task(void *p) {
+  // NOTE: Reuse the code from Part 0
+  int adc_reading = 0;
+  pwm1__init_single_edge(1000);
+  pin_configure_pwm_channel_as_io_pin();
+  pwm1__set_duty_cycle(PWM1__2_0, 50);
+
+  // int adc_reading = 0;
+  while (1) {
+    // Implement code to receive potentiometer value from queue
+    if (xQueueReceive(adc_to_pwm_task_queue, &adc_reading, 100)) {
+      fprintf(stderr, "RECEIVED ADC READING: %d\n", adc_reading);
+    }
+    // We do not need task delay because our queue API will put task to sleep when there is no data in the queue
+    // vTaskDelay(100);
+  }
+}
+
+#endif
+
 int main(void) {
+
+
+#ifdef Part_2_3
+  adc_to_pwm_task_queue = xQueueCreate(1, sizeof(int));
+  xTaskCreate(adc_task, "adc_task", 1024, NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(pwm_task, "pwm_task", 1024, NULL, PRIORITY_LOW, NULL);
+#endif
 
 #ifdef Part_1
   xTaskCreate(adc_task, "adc_task", 1024, NULL, PRIORITY_LOW, NULL);
