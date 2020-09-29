@@ -8,8 +8,8 @@
 #include "pwm1.h"
 #include "queue.h"
 
-/// Change to Part_0, Part_1, Part_2_3
-#define Part_2_3
+/// Change to Part_0, Part_1, Part_2_3, Extra_Credit
+#define Extra_Credit
 
 #ifdef Part_0
 
@@ -75,8 +75,10 @@ void pin_configure_adc_channel_as_io_pin() { gpio__construct_with_function(GPIO_
 void pin_configure_pwm_channel_as_io_pin() { gpio__construct_with_function(GPIO__PORT_2, 0, GPIO__FUNCTION_1); }
 
 // Mapping a numeric range onto another defined range
-static double range_mapping(double current_value, double input_minimum, double input_maximum, double output_minimum, double output_maximum) {
-  return (current_value - input_minimum) * (output_maximum - output_minimum) / (input_maximum - input_minimum) + output_minimum;
+static double range_mapping(double current_value, double input_minimum, double input_maximum, double output_minimum,
+                            double output_maximum) {
+  return (current_value - input_minimum) * (output_maximum - output_minimum) / (input_maximum - input_minimum) +
+         output_minimum;
 }
 
 static void adc_task(void *p) {
@@ -109,7 +111,7 @@ static void pwm_task(void *p) {
   while (1) {
     // Implement code to receive potentiometer value from queue
     if (xQueueReceive(adc_to_pwm_task_queue, &adc_reading, 100)) {
-      adc_voltage = adc_reading * 3.3 / 4095; 
+      adc_voltage = adc_reading * 3.3 / 4095;
       brightness_percent = range_mapping((double)adc_reading, 48.0, 4095.0, 0.0, 100.0);
       adc_to_pwm_duty_cycle = range_mapping((double)adc_reading, 48.0, 4095.0, 0.0, 100.0);
       fprintf(stderr, "RECEIVED ADC VOLTAGE: %.1f\n", adc_voltage);
@@ -123,7 +125,124 @@ static void pwm_task(void *p) {
 
 #endif
 
+#ifdef Extra_Credit
+
+static QueueHandle_t adc_to_pwm_task_queue;
+
+void pin_configure_adc_channel_as_io_pin() { gpio__construct_with_function(GPIO__PORT_0, 25, GPIO__FUNCTION_1); }
+
+void pin_configure_pwm_channel_as_io_pin() {
+  gpio__construct_with_function(GPIO__PORT_2, 0, GPIO__FUNCTION_1);
+  gpio__construct_with_function(GPIO__PORT_2, 1, GPIO__FUNCTION_1);
+  gpio__construct_with_function(GPIO__PORT_2, 2, GPIO__FUNCTION_1);
+}
+
+static void adc_task(void *p) {
+  adc__initialize();
+  adc__enable_burst_mode();
+  pin_configure_adc_channel_as_io_pin();
+
+  int adc_reading = 0;
+  while (1) {
+    adc_reading = adc__get_channel_reading_with_burst_mode(ADC__CHANNEL_2);
+    fprintf(stderr, "SENT ADC READING: %d\n", adc_reading);
+    xQueueSend(adc_to_pwm_task_queue, &adc_reading, 0);
+    vTaskDelay(250);
+  }
+}
+
+static double range_mapping(double current_value, double input_minimum, double input_maximum, double output_minimum,
+                            double output_maximum) {
+  return (current_value - input_minimum) * (output_maximum - output_minimum) / (input_maximum - input_minimum) +
+         output_minimum;
+}
+
+static void pwm_task(void *p) {
+  int adc_reading = 0;
+  pwm1__init_single_edge(1000);
+  pin_configure_pwm_channel_as_io_pin();
+  pwm1__set_duty_cycle(PWM1__2_0, 50);
+  pwm1__set_duty_cycle(PWM1__2_1, 50);
+  pwm1__set_duty_cycle(PWM1__2_2, 50);
+
+  int adc_to_pwm_color = 0;
+  while (1) {
+    if (xQueueReceive(adc_to_pwm_task_queue, &adc_reading, 100)) {
+      adc_to_pwm_color = range_mapping((double)adc_reading, 55.0, 4095.0, 0.0, 100.0);
+      fprintf(stderr, "LED BRIGHTNESS: %d\n", adc_to_pwm_color);
+      if (adc_to_pwm_color > 0 && adc_to_pwm_color <= 8.3) { // RED
+        pwm1__set_duty_cycle(PWM1__2_0, 100);                // R
+        pwm1__set_duty_cycle(PWM1__2_1, 0);                  // G
+        pwm1__set_duty_cycle(PWM1__2_2, 0);                  // B
+      }
+      if (adc_to_pwm_color > 8.3 && adc_to_pwm_color <= 16.6) { // ROSE
+        pwm1__set_duty_cycle(PWM1__2_0, 100);                   // R
+        pwm1__set_duty_cycle(PWM1__2_1, 0);                     // G
+        pwm1__set_duty_cycle(PWM1__2_2, 50);                    // B
+      }
+      if (adc_to_pwm_color > 16.6 && adc_to_pwm_color <= 24.9) { // MAGENTA
+        pwm1__set_duty_cycle(PWM1__2_0, 100);                    // R
+        pwm1__set_duty_cycle(PWM1__2_1, 0);                      // G
+        pwm1__set_duty_cycle(PWM1__2_2, 100);                    // B
+      }
+      if (adc_to_pwm_color > 24.9 && adc_to_pwm_color <= 33.3) { // VIOLET
+        pwm1__set_duty_cycle(PWM1__2_0, 50);                     // R
+        pwm1__set_duty_cycle(PWM1__2_1, 0);                      // G
+        pwm1__set_duty_cycle(PWM1__2_2, 100);                    // B
+      }
+      if (adc_to_pwm_color > 33.3 && adc_to_pwm_color <= 41.5) { // BLUE
+        pwm1__set_duty_cycle(PWM1__2_0, 0);                      // R
+        pwm1__set_duty_cycle(PWM1__2_1, 0);                      // G
+        pwm1__set_duty_cycle(PWM1__2_2, 100);                    // B
+      }
+      if (adc_to_pwm_color > 41.5 && adc_to_pwm_color <= 49.8) { // AZURE
+        pwm1__set_duty_cycle(PWM1__2_0, 0);                      // R
+        pwm1__set_duty_cycle(PWM1__2_1, 50);                     // G
+        pwm1__set_duty_cycle(PWM1__2_2, 100);                    // B
+      }
+      if (adc_to_pwm_color > 49.8 && adc_to_pwm_color <= 58.1) { // CYAN
+        pwm1__set_duty_cycle(PWM1__2_0, 0);                      // R
+        pwm1__set_duty_cycle(PWM1__2_1, 100);                    // G
+        pwm1__set_duty_cycle(PWM1__2_2, 100);                    // B
+      }
+      if (adc_to_pwm_color > 58.1 && adc_to_pwm_color <= 66.4) { // SPRING GREEN
+        pwm1__set_duty_cycle(PWM1__2_0, 0);                      // R
+        pwm1__set_duty_cycle(PWM1__2_1, 100);                    // G
+        pwm1__set_duty_cycle(PWM1__2_2, 50);                     // B
+      }
+      if (adc_to_pwm_color > 66.4 && adc_to_pwm_color <= 74.7) { // GREEN
+        pwm1__set_duty_cycle(PWM1__2_0, 0);                      // R
+        pwm1__set_duty_cycle(PWM1__2_1, 100);                    // G
+        pwm1__set_duty_cycle(PWM1__2_2, 0);                      // B
+      }
+      if (adc_to_pwm_color > 74.7 && adc_to_pwm_color <= 83) { // CHARTREUSE
+        pwm1__set_duty_cycle(PWM1__2_0, 50);                   // R
+        pwm1__set_duty_cycle(PWM1__2_1, 100);                  // G
+        pwm1__set_duty_cycle(PWM1__2_2, 0);                    // B
+      }
+      if (adc_to_pwm_color > 83 && adc_to_pwm_color <= 91.3) { // YELLOW
+        pwm1__set_duty_cycle(PWM1__2_0, 100);                  // R
+        pwm1__set_duty_cycle(PWM1__2_1, 100);                  // G
+        pwm1__set_duty_cycle(PWM1__2_2, 0);                    // B
+      }
+      if (adc_to_pwm_color > 91.3 && adc_to_pwm_color <= 100) { // ORANGE
+        pwm1__set_duty_cycle(PWM1__2_0, 100);                   // R
+        pwm1__set_duty_cycle(PWM1__2_1, 50);                    // G
+        pwm1__set_duty_cycle(PWM1__2_2, 0);                     // B
+      }
+    }
+  }
+}
+
+#endif
+
 int main(void) {
+
+#ifdef Extra_Credit
+  adc_to_pwm_task_queue = xQueueCreate(1, sizeof(int));
+  xTaskCreate(adc_task, "adc_task", 1024, NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(pwm_task, "pwm_task", 1024, NULL, PRIORITY_LOW, NULL);
+#endif
 
 #ifdef Part_2_3
   adc_to_pwm_task_queue = xQueueCreate(1, sizeof(int));
