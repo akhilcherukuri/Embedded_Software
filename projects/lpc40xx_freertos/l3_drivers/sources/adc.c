@@ -30,6 +30,29 @@ void adc__initialize(void) {
   }
 }
 
+void adc__enable_burst_mode() {
+  // Enable Burst Mode
+  LPC_ADC->CR |= (1U << 16);
+  // START bits must be 000 when BURST = 1 or conversions will not start.
+  LPC_ADC->CR &= ~(7U << 24);
+}
+
+uint16_t adc__get_channel_reading_with_burst_mode(uint8_t channel_number) {
+  uint16_t result = 0;
+  const uint16_t twelve_bits = 0x0FFF;
+
+  // Select Channel
+  LPC_ADC->CR |= (1U << channel_number);
+  // The ADC function must be selected via the ADMODE bit in the related IOCON registers in order to obtain voltage
+  // readings on the monitored pin.
+  LPC_IOCON->P0_25 &= ~(1 << 7);
+
+  if ((ADC__CHANNEL_2 == channel_number) || (ADC__CHANNEL_4 == channel_number) || (ADC__CHANNEL_5 == channel_number)) {
+    result = (LPC_ADC->DR[channel_number] >> 4) & twelve_bits;
+  }
+  return result;
+}
+
 uint16_t adc__get_adc_value(adc_channel_e channel_num) {
   uint16_t result = 0;
   const uint16_t twelve_bits = 0x0FFF;
