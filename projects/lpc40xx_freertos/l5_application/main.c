@@ -169,78 +169,78 @@ static void pwm_task(void *p) {
   while (1) {
     if (xQueueReceive(adc_to_pwm_task_queue, &adc_reading, 100)) {
       adc_to_pwm_color = range_mapping((double)adc_reading, 55.0, 4095.0, 0.0, 100.0);
-      //fprintf(stderr, "LED BRIGHTNESS: %d\n", adc_to_pwm_color);
+      // fprintf(stderr, "LED BRIGHTNESS: %d\n", adc_to_pwm_color);
       if (adc_to_pwm_color > 0 && adc_to_pwm_color <= 8.3) { // RED
         pwm1__set_duty_cycle(PWM1__2_0, 100);                // R
         pwm1__set_duty_cycle(PWM1__2_1, 0);                  // G
         pwm1__set_duty_cycle(PWM1__2_2, 0);                  // B
-        fprintf(stderr, "RED\n"); 
+        fprintf(stderr, "RED\n");
       }
       if (adc_to_pwm_color > 8.3 && adc_to_pwm_color <= 16.6) { // ROSE
         pwm1__set_duty_cycle(PWM1__2_0, 100);                   // R
         pwm1__set_duty_cycle(PWM1__2_1, 0);                     // G
         pwm1__set_duty_cycle(PWM1__2_2, 50);                    // B
-        fprintf(stderr, "ROSE\n"); 
+        fprintf(stderr, "ROSE\n");
       }
       if (adc_to_pwm_color > 16.6 && adc_to_pwm_color <= 24.9) { // MAGENTA
         pwm1__set_duty_cycle(PWM1__2_0, 100);                    // R
         pwm1__set_duty_cycle(PWM1__2_1, 0);                      // G
         pwm1__set_duty_cycle(PWM1__2_2, 100);                    // B
-        fprintf(stderr, "MAGENTA\n"); 
+        fprintf(stderr, "MAGENTA\n");
       }
       if (adc_to_pwm_color > 24.9 && adc_to_pwm_color <= 33.3) { // VIOLET
         pwm1__set_duty_cycle(PWM1__2_0, 50);                     // R
         pwm1__set_duty_cycle(PWM1__2_1, 0);                      // G
         pwm1__set_duty_cycle(PWM1__2_2, 100);                    // B
-        fprintf(stderr, "VIOLET\n"); 
+        fprintf(stderr, "VIOLET\n");
       }
       if (adc_to_pwm_color > 33.3 && adc_to_pwm_color <= 41.5) { // BLUE
         pwm1__set_duty_cycle(PWM1__2_0, 0);                      // R
         pwm1__set_duty_cycle(PWM1__2_1, 0);                      // G
         pwm1__set_duty_cycle(PWM1__2_2, 100);                    // B
-        fprintf(stderr, "BLUE\n"); 
+        fprintf(stderr, "BLUE\n");
       }
       if (adc_to_pwm_color > 41.5 && adc_to_pwm_color <= 49.8) { // AZURE
         pwm1__set_duty_cycle(PWM1__2_0, 0);                      // R
         pwm1__set_duty_cycle(PWM1__2_1, 50);                     // G
         pwm1__set_duty_cycle(PWM1__2_2, 100);                    // B
-        fprintf(stderr, "AZURE\n"); 
+        fprintf(stderr, "AZURE\n");
       }
       if (adc_to_pwm_color > 49.8 && adc_to_pwm_color <= 58.1) { // CYAN
         pwm1__set_duty_cycle(PWM1__2_0, 0);                      // R
         pwm1__set_duty_cycle(PWM1__2_1, 100);                    // G
         pwm1__set_duty_cycle(PWM1__2_2, 100);                    // B
-        fprintf(stderr, "CYAN\n"); 
+        fprintf(stderr, "CYAN\n");
       }
       if (adc_to_pwm_color > 58.1 && adc_to_pwm_color <= 66.4) { // SPRING GREEN
         pwm1__set_duty_cycle(PWM1__2_0, 0);                      // R
         pwm1__set_duty_cycle(PWM1__2_1, 100);                    // G
         pwm1__set_duty_cycle(PWM1__2_2, 50);                     // B
-        fprintf(stderr, "SPRING GREEN\n"); 
+        fprintf(stderr, "SPRING GREEN\n");
       }
       if (adc_to_pwm_color > 66.4 && adc_to_pwm_color <= 74.7) { // GREEN
         pwm1__set_duty_cycle(PWM1__2_0, 0);                      // R
         pwm1__set_duty_cycle(PWM1__2_1, 100);                    // G
         pwm1__set_duty_cycle(PWM1__2_2, 0);                      // B
-        fprintf(stderr, "GREEN\n"); 
+        fprintf(stderr, "GREEN\n");
       }
       if (adc_to_pwm_color > 74.7 && adc_to_pwm_color <= 83) { // CHARTREUSE
         pwm1__set_duty_cycle(PWM1__2_0, 50);                   // R
         pwm1__set_duty_cycle(PWM1__2_1, 100);                  // G
         pwm1__set_duty_cycle(PWM1__2_2, 0);                    // B
-        fprintf(stderr, "CHARTREUSE\n"); 
+        fprintf(stderr, "CHARTREUSE\n");
       }
       if (adc_to_pwm_color > 83 && adc_to_pwm_color <= 91.3) { // YELLOW
         pwm1__set_duty_cycle(PWM1__2_0, 100);                  // R
         pwm1__set_duty_cycle(PWM1__2_1, 100);                  // G
         pwm1__set_duty_cycle(PWM1__2_2, 0);                    // B
-        fprintf(stderr, "YELLOW\n"); 
+        fprintf(stderr, "YELLOW\n");
       }
       if (adc_to_pwm_color > 91.3 && adc_to_pwm_color <= 100) { // ORANGE
         pwm1__set_duty_cycle(PWM1__2_0, 100);                   // R
         pwm1__set_duty_cycle(PWM1__2_1, 50);                    // G
         pwm1__set_duty_cycle(PWM1__2_2, 0);                     // B
-        fprintf(stderr, "ORANGE\n"); 
+        fprintf(stderr, "ORANGE\n");
       }
     }
   }
