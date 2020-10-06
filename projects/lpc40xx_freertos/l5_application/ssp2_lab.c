@@ -1,4 +1,5 @@
 #include "ssp2_lab.h"
+#include "clock.h"
 #include "gpio.h"
 #include "lpc40xx.h"
 
@@ -9,7 +10,7 @@ void ssp2__init(uint32_t max_clock_mhz) {
   LPC_SC->PCONP |= power_on_bit;
   // b) Setup control registers CR0 and CR1
   const uint32_t dss_bits = (0b111 << 0);
-  const uint32_t sse_bit = (0b1 << 0);
+  const uint32_t sse_bit = (0b1 << 1);
   LPC_SSP2->CR0 |= dss_bits;
   LPC_SSP2->CR1 |= sse_bit;
   // c) Setup prescalar register to be <= max_clock_mhz
