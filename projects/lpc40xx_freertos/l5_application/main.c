@@ -2,13 +2,14 @@
 #include <stdio.h>
 
 #include "FreeRTOS.h"
+#include "delay.h"
 #include "semphr.h"
 #include "task.h"
 
 #include "gpio.h"
 #include "sj2_cli.h"
 
-#define Part_2
+#define Part_3
 
 // TODO: Study the Adesto flash 'Manufacturer and Device ID' section
 typedef struct {
@@ -16,6 +17,8 @@ typedef struct {
   uint8_t device_id_1;
   uint8_t device_id_2;
   uint8_t extended_device_id;
+  // Extra Credit
+  uint8_t flash_data;
 } adesto_flash_id_s;
 
 void adesto_cs(void);
@@ -26,18 +29,34 @@ void spi_task(void *p);
 #endif
 #ifdef Part_2
 void spi_id_verification_task1(void *p);
-void spi_id_verification_task1(void *p);
+void spi_id_verification_task2(void *p);
 SemaphoreHandle_t spi_flash_mutex;
 #endif
-static adesto_flash_id_s adesto_read_signature(void);
+#ifdef Part_3
+void spi_task_extra(void *p);
+SemaphoreHandle_t spi_flash_mutex_extra;
+#endif
+// static adesto_flash_id_s adesto_read_signature(void);
+static adesto_flash_id_s adesto_read_write_signature(void);
 gpio_s adesto_external_flash_cs_signal = {GPIO__PORT_1, 10};
+gpio_s trigger_external_flash_cs_signal = {GPIO__PORT_1, 20};
 
 // TODO: Implement Adesto flash memory CS signal as a GPIO driver
-void adesto_cs(void) { gpio__reset(adesto_external_flash_cs_signal); }
-void adesto_ds(void) { gpio__set(adesto_external_flash_cs_signal); }
+void adesto_cs(void) {
+  gpio__reset(adesto_external_flash_cs_signal);
+  gpio__set_as_output(trigger_external_flash_cs_signal);
+  gpio__reset(trigger_external_flash_cs_signal);
+}
+void adesto_ds(void) {
+  gpio__set(adesto_external_flash_cs_signal);
+  gpio__set_as_output(trigger_external_flash_cs_signal);
+  gpio__set(trigger_external_flash_cs_signal);
+}
 
 // TODO: Implement the code to read Adesto flash memory signature
 // TODO: Create struct of type 'adesto_flash_id_s' and return it
+// Part_1 or Part_2
+#ifdef Part_2
 static adesto_flash_id_s adesto_read_signature(void) {
   const uint8_t read_opcode = 0x9F;
   const uint8_t read_byte = 0xAB;
@@ -57,6 +76,7 @@ static adesto_flash_id_s adesto_read_signature(void) {
 
   return data;
 }
+#endif
 void ssp2_pin_configuration(void) {
   gpio__construct_with_function(1, 0, GPIO__FUNCTION_4);
   gpio__construct_with_function(1, 1, GPIO__FUNCTION_4);
@@ -91,7 +111,7 @@ void spi_task(void *p) {
 
 #ifdef Part_2
 void spi_id_verification_task1(void *p) {
-  const uint32_t spi_clock_mhz = 24;
+  const uint32_t spi_clock_mhz = 12;
   ssp2__init(spi_clock_mhz);
   ssp2_pin_configuration();
   gpio__set_as_output(adesto_external_flash_cs_signal);
@@ -116,7 +136,7 @@ void spi_id_verification_task1(void *p) {
   }
 }
 void spi_id_verification_task2(void *p) {
-  const uint32_t spi_clock_mhz = 24;
+  const uint32_t spi_clock_mhz = 12;
   ssp2__init(spi_clock_mhz);
   ssp2_pin_configuration();
   gpio__set_as_output(adesto_external_flash_cs_signal);
@@ -142,7 +162,83 @@ void spi_id_verification_task2(void *p) {
 }
 #endif
 
+#ifdef Part_3
+/**
+ * Adesto flash asks to send 24-bit address
+ * We can use our usual uint32_t to store the address
+ * and then transmit this address over the SPI driver
+ * one byte at a time
+ */
+void adesto_flash_send_address(uint32_t address) {
+  (void)ssp2__exchange_byte_lab((address >> 16) & 0xFF);
+  (void)ssp2__exchange_byte_lab((address >> 8) & 0xFF);
+  (void)ssp2__exchange_byte_lab((address >> 0) & 0xFF);
+}
+
+void adesto_write_data(void) {
+  // Protection Commands
+  const uint8_t write_enable = 0x06;
+  // Page Commands
+  const uint8_t page_write = 0x02;
+  const uint32_t page_address = 0x000000;
+  const uint8_t data_send = 0xAB;
+
+  adesto_cs();
+  {
+    ssp2__exchange_byte_lab(write_enable);
+    ssp2__exchange_byte_lab(page_write);
+    adesto_flash_send_address(page_address);
+    ssp2__exchange_byte_lab(data_send);
+    printf("Write Operation Data: %x | ", data_send);
+  }
+  adesto_ds();
+
+  delay__us(2);
+}
+
+static adesto_flash_id_s adesto_read_write_signature(void) {
+  adesto_flash_id_s data = {0};
+  // Page Commands
+  const uint8_t dummy_byte = 0xFF;
+  const uint8_t page_read = 0x03;
+  const uint32_t page_address = 0x000000;
+
+  adesto_write_data();
+
+  adesto_cs();
+  {
+    ssp2__exchange_byte_lab(page_read);
+    adesto_flash_send_address(page_address);
+    data.flash_data = ssp2__exchange_byte_lab(dummy_byte);
+  }
+  adesto_ds();
+  return data;
+}
+
+void spi_task_extra(void *p) {
+  const uint32_t spi_clock_mhz = 12;
+  ssp2__init(spi_clock_mhz);
+  ssp2_pin_configuration();
+  gpio__set_as_output(adesto_external_flash_cs_signal);
+  while (1) {
+    if (xSemaphoreTake(spi_flash_mutex_extra, 1000)) {
+      const adesto_flash_id_s id = adesto_read_write_signature();
+      printf(" Read Data Operation: %x \n", id.flash_data);
+      xSemaphoreGive(spi_flash_mutex_extra);
+    }
+    vTaskDelay(500);
+  }
+}
+
+#endif
+
 int main(void) {
+
+#ifdef Part_3
+  spi_flash_mutex_extra = xSemaphoreCreateMutex();
+  xTaskCreate(spi_task_extra, "SPI Task Extra", 4096, NULL, PRIORITY_LOW, NULL);
+#endif
+
 #ifdef Part_2
   spi_flash_mutex = xSemaphoreCreateMutex();
   xTaskCreate(spi_id_verification_task1, "SPI ID Task 1", 4096, NULL, PRIORITY_LOW, NULL);
