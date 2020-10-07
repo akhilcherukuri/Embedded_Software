@@ -36,8 +36,7 @@ SemaphoreHandle_t spi_flash_mutex;
 void spi_task_extra(void *p);
 SemaphoreHandle_t spi_flash_mutex_extra;
 #endif
-// static adesto_flash_id_s adesto_read_signature(void);
-static adesto_flash_id_s adesto_read_write_signature(void);
+static adesto_flash_id_s adesto_read_signature(void);
 gpio_s adesto_external_flash_cs_signal = {GPIO__PORT_1, 10};
 gpio_s trigger_external_flash_cs_signal = {GPIO__PORT_1, 20};
 
@@ -175,35 +174,86 @@ void adesto_flash_send_address(uint32_t address) {
   (void)ssp2__exchange_byte_lab((address >> 0) & 0xFF);
 }
 
-void adesto_write_data(void) {
-  // Protection Commands
-  const uint8_t write_enable = 0x06;
-  // Page Commands
-  const uint8_t page_write = 0x02;
-  const uint32_t page_address = 0x000000;
-  const uint8_t data_send = 0xAB;
+static adesto_flash_id_s adesto_read_manufacturer(void) {
+  const uint8_t read_opcode = 0x9F;
+  const uint8_t read_byte = 0xFF;
+  adesto_flash_id_s data1 = {0};
 
   adesto_cs();
   {
-    ssp2__exchange_byte_lab(write_enable);
-    ssp2__exchange_byte_lab(page_write);
-    adesto_flash_send_address(page_address);
-    ssp2__exchange_byte_lab(data_send);
-    printf("Write Operation Data: %x | ", data_send);
+    ssp2__exchange_byte_lab(read_opcode);
+    data1.manufacturer_id = ssp2__exchange_byte_lab(read_byte);
   }
   adesto_ds();
 
-  delay__us(2);
+  return data1;
 }
 
-static adesto_flash_id_s adesto_read_write_signature(void) {
-  adesto_flash_id_s data = {0};
+static void adesto_write_enable(void) {
+  // Protection Comands
+  const uint8_t write_enable = 0x06;
+  adesto_cs();
+  { ssp2__exchange_byte_lab(write_enable); }
+  adesto_ds();
+}
+
+static void adesto_page_erase(void) {
   // Page Commands
+  const uint8_t page_erase = 0x20;
+  const uint32_t page_address = 0x000000;
+  adesto_cs();
+  {
+    ssp2__exchange_byte_lab(page_erase);
+    adesto_flash_send_address(page_address);
+  }
+  adesto_ds();
+  vTaskDelay(300);
+}
+
+static void adesto_register_value(void) {
+  const uint8_t dummy_byte = 0xFF;
+  const uint8_t status_check_register1 = 0x05;
+  adesto_cs();
+  {
+    ssp2__exchange_byte_lab(status_check_register1);
+    const uint8_t status_check_register_data = ssp2__exchange_byte_lab(dummy_byte);
+    printf("Status Register value = %X | ", status_check_register_data);
+  }
+  adesto_ds();
+}
+
+static void adesto_data_sent(void) {
+  // Page Commands
+  const uint8_t page_write = 0x02;
+  const uint32_t page_address = 0x000000;
+  const uint8_t data_send = 0x43;
+  adesto_cs();
+  {
+    ssp2__exchange_byte_lab(page_write);
+    adesto_flash_send_address(page_address);
+    ssp2__exchange_byte_lab(data_send);
+    printf(" Write Data Operation: %X \n", data_send);
+  }
+  adesto_ds();
+}
+
+static adesto_flash_id_s adesto_read_signature(void) {
+  adesto_flash_id_s data = {0};
   const uint8_t dummy_byte = 0xFF;
   const uint8_t page_read = 0x03;
   const uint32_t page_address = 0x000000;
 
-  adesto_write_data();
+  adesto_write_enable();
+
+  adesto_page_erase();
+
+  adesto_register_value();
+
+  adesto_write_enable();
+
+  adesto_data_sent();
+
+  adesto_register_value();
 
   adesto_cs();
   {
@@ -222,8 +272,15 @@ void spi_task_extra(void *p) {
   gpio__set_as_output(adesto_external_flash_cs_signal);
   while (1) {
     if (xSemaphoreTake(spi_flash_mutex_extra, 1000)) {
-      const adesto_flash_id_s id = adesto_read_write_signature();
-      printf(" Read Data Operation: %x \n", id.flash_data);
+      const adesto_flash_id_s id1 = adesto_read_manufacturer();
+      if (id1.manufacturer_id == 0x1F) {
+        const adesto_flash_id_s id = adesto_read_signature();
+        printf(" Read Data Operation: %X \n", id.flash_data);
+      }
+      if (id1.manufacturer_id != 0x1F) {
+        printf("Manufacturer ID read failure \n");
+        vTaskSuspend(NULL);
+      }
       xSemaphoreGive(spi_flash_mutex_extra);
     }
     vTaskDelay(500);
