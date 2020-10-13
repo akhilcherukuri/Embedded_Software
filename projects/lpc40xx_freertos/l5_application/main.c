@@ -110,7 +110,7 @@ void board_2_receiver_task(void *p) {
       // TODO: Store data to number_as_string[] array one char at a time
       // Hint: Use counter as an index, and increment it as long as we do not reach max value of 16
       for (counter = 0; counter < 16; counter++) {
-        number_as_string[counter++] = byte;
+        number_as_string[counter] = byte;
       }
     }
   }
