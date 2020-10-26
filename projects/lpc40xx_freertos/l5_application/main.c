@@ -1,105 +1,134 @@
+/******************************
+ *                            *
+ * CMPE 244                   *
+ * Lab: Watchdog-app          *
+ * 10/24/2020                 *
+ *                            *
+ * Contributors:              *
+ *                            *
+ * Salvatore Nicosia          *
+ * Akash Vachhani             *
+ * Akhil Cherukuri            *
+ *                            *
+ ******************************/
+
 #include <stdio.h>
+#include <string.h>
 
 #include "FreeRTOS.h"
+#include "event_groups.h"
+#include "queue.h"
 #include "task.h"
 
-#include "board_io.h"
-#include "common_macros.h"
-#include "periodic_scheduler.h"
+#include "acceleration.h"
+#include "ff.h"
 #include "sj2_cli.h"
+#include "sys_time.h"
 
-// 'static' to make these functions 'private' to this file
-static void create_blinky_tasks(void);
-static void create_uart_task(void);
-static void blink_task(void *params);
-static void uart_task(void *params);
+/* Handles */
+static QueueHandle_t sensor_queue;
+static EventGroupHandle_t checkin;
+
+/* Tasks */
+static void producer_task(void *p);
+static void consumer_task(void *p);
+static void watchdog_task(void *p);
+
+/* Helper functions */
+static void write_file_using_fatfs_pi(int16_t value, const char *filename);
+
+/* Static global variables */
+static const EventBits_t bit_1 = (1 << 1);
+static const EventBits_t bit_2 = (1 << 2);
 
 int main(void) {
-  create_blinky_tasks();
-  create_uart_task();
 
-  // If you have the ESP32 wifi module soldered on the board, you can try uncommenting this code
-  // See esp32/README.md for more details
-  // uart3_init();                                                                     // Also include:  uart3_init.h
-  // xTaskCreate(esp32_tcp_hello_world_task, "uart3", 1000, NULL, PRIORITY_LOW, NULL); // Include esp32_task.h
+  sensor_queue = xQueueCreate(100, sizeof(int16_t));
+  checkin = xEventGroupCreate();
+  acceleration__init();
 
+  xTaskCreate(producer_task, "producer", 2048 / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(consumer_task, "consumer", 2048 / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(watchdog_task, "watchdog", 2048 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
+
+  sj2_cli__init();
   puts("Starting RTOS");
   vTaskStartScheduler(); // This function never returns unless RTOS scheduler runs out of memory and fails
 
   return 0;
 }
 
-static void create_blinky_tasks(void) {
-  /**
-   * Use '#if (1)' if you wish to observe how two tasks can blink LEDs
-   * Use '#if (0)' if you wish to use the 'periodic_scheduler.h' that will spawn 4 periodic tasks, one for each LED
-   */
-#if (1)
-  // These variables should not go out of scope because the 'blink_task' will reference this memory
-  static gpio_s led0, led1;
+static void producer_task(void *p) {
+  int16_t average_sensor_value = 0;
+  int16_t sensor_values_sum = 0;
+  size_t sensor_values_count = 0;
+  acceleration__axis_data_s accelerometer_axis_data = {0};
 
-  led0 = board_io__get_led0();
-  led1 = board_io__get_led1();
-
-  xTaskCreate(blink_task, "led0", configMINIMAL_STACK_SIZE, (void *)&led0, PRIORITY_LOW, NULL);
-  xTaskCreate(blink_task, "led1", configMINIMAL_STACK_SIZE, (void *)&led1, PRIORITY_LOW, NULL);
-#else
-  const bool run_1000hz = true;
-  const size_t stack_size_bytes = 2048 / sizeof(void *); // RTOS stack size is in terms of 32-bits for ARM M4 32-bit CPU
-  periodic_scheduler__initialize(stack_size_bytes, !run_1000hz); // Assuming we do not need the high rate 1000Hz task
-  UNUSED(blink_task);
-#endif
-}
-
-static void create_uart_task(void) {
-  // It is advised to either run the uart_task, or the SJ2 command-line (CLI), but not both
-  // Change '#if (0)' to '#if (1)' and vice versa to try it out
-#if (0)
-  // printf() takes more stack space, size this tasks' stack higher
-  xTaskCreate(uart_task, "uart", (512U * 8) / sizeof(void *), NULL, PRIORITY_LOW, NULL);
-#else
-  sj2_cli__init();
-  UNUSED(uart_task); // uart_task is un-used in if we are doing cli init()
-#endif
-}
-
-static void blink_task(void *params) {
-  const gpio_s led = *((gpio_s *)params); // Parameter was input while calling xTaskCreate()
-
-  // Warning: This task starts with very minimal stack, so do not use printf() API here to avoid stack overflow
-  while (true) {
-    gpio__toggle(led);
-    vTaskDelay(500);
+  while (1) {
+    if (sensor_values_count < 100) {
+      accelerometer_axis_data = acceleration__get_data();
+      sensor_values_sum += accelerometer_axis_data.x;
+      sensor_values_count++;
+      vTaskDelay(1);
+    } else {
+      average_sensor_value = (sensor_values_sum / sensor_values_count);
+      xQueueSend(sensor_queue, &average_sensor_value, 0);
+      xEventGroupSetBits(checkin, bit_1);
+      vTaskDelay(100);
+    }
   }
 }
 
-// This sends periodic messages over printf() which uses system_calls.c to send them to UART0
-static void uart_task(void *params) {
-  TickType_t previous_tick = 0;
-  TickType_t ticks = 0;
+static void consumer_task(void *p) {
+  int16_t average_sensor_value = 0;
+  uint32_t time_elapsed = sys_time__get_uptime_ms();
+  const char *filename = "accelerometer_x_axis_data.csv";
 
-  while (true) {
-    // This loop will repeat at precise task delay, even if the logic below takes variable amount of ticks
-    vTaskDelayUntil(&previous_tick, 2000);
+  while (1) {
+    if (xQueueReceive(sensor_queue, &average_sensor_value, portMAX_DELAY)) {
+      xEventGroupSetBits(checkin, bit_2);
+      // Open a file and append the data to an output file on the SD card every 1 sec or so
+      if (sys_time__get_uptime_ms() - time_elapsed > 1000) {
+        write_file_using_fatfs_pi(average_sensor_value, filename);
+        time_elapsed = sys_time__get_uptime_ms();
+      }
+    }
+  }
+}
 
-    /* Calls to fprintf(stderr, ...) uses polled UART driver, so this entire output will be fully
-     * sent out before this function returns. See system_calls.c for actual implementation.
-     *
-     * Use this style print for:
-     *  - Interrupts because you cannot use printf() inside an ISR
-     *    This is because regular printf() leads down to xQueueSend() that might block
-     *    but you cannot block inside an ISR hence the system might crash
-     *  - During debugging in case system crashes before all output of printf() is sent
-     */
-    ticks = xTaskGetTickCount();
-    fprintf(stderr, "%u: This is a polled version of printf used for debugging ... finished in", (unsigned)ticks);
-    fprintf(stderr, " %lu ticks\n", (xTaskGetTickCount() - ticks));
+static void watchdog_task(void *p) {
+  const EventBits_t wait_for_bit_1_bit_2 = bit_1 | bit_2;
+  EventBits_t bits_set;
 
-    /* This deposits data to an outgoing queue and doesn't block the CPU
-     * Data will be sent later, but this function would return earlier
-     */
-    ticks = xTaskGetTickCount();
-    printf("This is a more efficient printf ... finished in");
-    printf(" %lu ticks\n\n", (xTaskGetTickCount() - ticks));
+  while (1) {
+    bits_set = xEventGroupWaitBits(checkin, wait_for_bit_1_bit_2, pdTRUE, pdFALSE, 200);
+
+    if ((bits_set & (bit_1 | bit_2)) == (bit_1 | bit_2)) {
+      printf("Check-in successfull from both producer and consumer task\n");
+    } else if ((bits_set & bit_1) != 0) {
+      printf("Check-in successfull from producer task\n");
+      printf("Consumer task failed to check-in\n");
+    } else {
+      printf("Producer and consumer task failed to check-in within the 200ms threshold\n");
+    }
+    vTaskDelay(1000);
+  }
+}
+
+static void write_file_using_fatfs_pi(int16_t value, const char *filename) {
+  FIL file; // File handle
+  UINT bytes_written = 0;
+  FRESULT result = f_open(&file, filename, (FA_WRITE | FA_OPEN_APPEND));
+
+  if (FR_OK == result) {
+    char string[64];
+    sprintf(string, "%li, %i\n", xTaskGetTickCount(), value);
+    if (FR_OK == f_write(&file, string, strlen(string), &bytes_written)) {
+    } else {
+      printf("ERROR: Failed to write data to file\n");
+    }
+    f_close(&file);
+  } else {
+    printf("ERROR: Failed to open: %s\n", filename);
   }
 }
