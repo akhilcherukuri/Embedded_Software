@@ -111,25 +111,34 @@ static void watchdog_task(void *p) {
     bits_set = xEventGroupWaitBits(checkin, wait_for_bit_1_bit_2, pdTRUE, pdFALSE, 200);
 
     if ((bits_set & (bit_1 | bit_2)) == (bit_1 | bit_2)) {
-      printf("Check-in successfull from both producer and consumer task\n");
+      printf("Check-in successful from both producer and consumer task\n");
     } else if ((bits_set & bit_1) != 0) {
-      printf("Check-in successfull from producer task\n");
-      printf("Consumer task failed to check-in\n");
+      printf("Check-in successful from producer task\n");
+      printf("ERROR: Consumer task failed to check-in\n");
       if (xSemaphoreTake(mutex, 10) == pdTRUE) {
         write_error_using_fatfs_pi("ERROR: Consumer task failed to check-in", filename);
         xSemaphoreGive(mutex);
       }
     } else if ((bits_set & bit_2) != 0) {
-      printf("Check-in successfull from consumer task\n");
-      printf("Producer task failed to check-in\n");
+      /*
+       * This case should never run when the producer task is suspended
+       * since the consumer task is stuck on xQueueReceive() and will never set bit 2.
+       */
+      printf("Check-in successful from consumer task\n");
+      printf("ERROR: Producer task failed to check-in\n");
       if (xSemaphoreTake(mutex, 10) == pdTRUE) {
         write_error_using_fatfs_pi("ERROR: Producer task failed to check-in", filename);
         xSemaphoreGive(mutex);
       }
     } else {
-      printf("Producer and Consumer task failed to check-in within the 200ms threshold\n");
+      printf("ERROR: Producer and Consumer task failed to check-in within the 200ms threshold\n");
+      printf("ERROR: Possibly due to consumer task blocked waiting on receiving as result of producer task failing to "
+             "check-in\n");
       if (xSemaphoreTake(mutex, 10) == pdTRUE) {
         write_error_using_fatfs_pi("ERROR: Producer and Consumer task failed to check-in within the 200ms threshold",
+                                   filename);
+        write_error_using_fatfs_pi("ERROR: Possibly due to consumer task blocked waiting on receiving as result of "
+                                   "producer task failing to check-in",
                                    filename);
         xSemaphoreGive(mutex);
       }
